@@ -4,5 +4,8 @@
 EditorBuildSettings:
   m_ObjectHideFlags: 0
   serializedVersion: 2
-  m_Scenes: []
+  m_Scenes:
+  - enabled: 1
+    path: Assets/Tests/InputSystem/Assets/UITKTestScene.unity
+    guid: f7924d25d4532204ea38efac326e8543
   m_configObjects: {}

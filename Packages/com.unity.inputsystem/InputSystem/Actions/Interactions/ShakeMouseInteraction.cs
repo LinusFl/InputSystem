@@ -1,6 +1,10 @@
 using System;
 using UnityEngine.InputSystem.Controls;
 using UnityEngine.Scripting;
+using System.Drawing.Text;
+using UnityEditor.Experimental.GraphView;
+
+
 #if UNITY_EDITOR
 using UnityEditor;
 using UnityEngine.InputSystem.Editor;
@@ -60,7 +64,7 @@ namespace UnityEngine.InputSystem.Interactions
         /// If this is less than or equal to 0 (the default), <see cref="InputSettings.defaultButtonPressPoint"/> is used instead.
         /// </remarks>
         [Tooltip("Direction velocity threshold that must be crossed for a direction angle to be valid.")]
-        public float mouseVelocityThreshold;
+        public float moveMagnitudeThreshold;
 
         /// <summary>
         /// Number of direction regions for registering a change of direction
@@ -72,7 +76,7 @@ namespace UnityEngine.InputSystem.Interactions
         public int numberOfDirectionRegions;
 
         private float swerveTimeOrDefault => swerveTime > 0.0 ? swerveTime : DefaultSwerveTime;
-        internal float swerveDelayOrDefault => swerveDelay > 0.0 ? swerveDelay : DefaultSwerveDelay;
+        private float swerveDelayOrDefault => swerveDelay > 0.0 ? swerveDelay : DefaultSwerveDelay;
 
 
         // ToDo: Remove
@@ -82,24 +86,28 @@ namespace UnityEngine.InputSystem.Interactions
         /// <inheritdoc />
         public void Process(ref InputInteractionContext context)
         {
+            return;
             if (context.timerHasExpired)
             {
                 // We use timers multiple times but no matter what, if they expire it means
                 // that we didn't get input in time.
                 context.Canceled();
-                Debug.Log("####### Canceled");
+                Debug.Log("####### Canceled 1");
                 return;
             }
 
             switch (m_CurrentTapPhase)
             {
-                case TapPhase.None:
+                case ShakePhase.WaitingForFirstSwerve:
+                    IsMoveLarge(context.ReadValue<Vector2>(), out var direction);
+
                     // if (context.ControlIsActuated(pressPointOrDefault))
                     {
-                        m_CurrentTapPhase = TapPhase.WaitingForNextRelease;
+                        m_CurrentTapPhase = ShakePhase.WaitingForNextRelease;
                         m_CurrentTapStartTime = context.time;
                         context.Started();
-                        Debug.Log("####### Started");
+                        var value = context.ReadValue<Vector2>();
+                        // Debug.Log("####### Started");
 
                         var maxTapTime = swerveTimeOrDefault;
                         var maxDelayInBetween = swerveDelayOrDefault;
@@ -113,7 +121,7 @@ namespace UnityEngine.InputSystem.Interactions
                     }
                     break;
 
-                case TapPhase.WaitingForNextRelease:
+                case ShakePhase.WaitingForNextRelease:
                     // if (!context.ControlIsActuated(releasePointOrDefault))
                     {
                         if (context.time - m_CurrentTapStartTime <= swerveTimeOrDefault)
@@ -122,11 +130,11 @@ namespace UnityEngine.InputSystem.Interactions
                             if (m_CurrentswerveCount >= swerveCount)
                             {
                                 context.Performed();
-                                Debug.Log("####### Performed");
+                                // Debug.Log("####### Performed");
                             }
                             else
                             {
-                                m_CurrentTapPhase = TapPhase.WaitingForNextRelease;
+                                m_CurrentTapPhase = ShakePhase.WaitingForNextRelease;
                                 m_LastTapReleaseTime = context.time;
                                 context.SetTimeout(swerveDelayOrDefault);
                             }
@@ -157,25 +165,44 @@ namespace UnityEngine.InputSystem.Interactions
             }
         }
 
+        private bool IsMoveLarge(Vector2 delta, out MoveDirection direction)
+        {
+            if (delta.magnitude > moveMagnitudeThreshold)
+            {
+                direction = MoveDirection.Right;
+                return true;
+            }
+            direction = MoveDirection.None;
+            return false;
+        }
+
         /// <inheritdoc />
         public void Reset()
         {
-            m_CurrentTapPhase = TapPhase.None;
+            return;
+            m_CurrentTapPhase = ShakePhase.WaitingForFirstSwerve;
             m_CurrentswerveCount = 0;
             m_CurrentTapStartTime = 0;
             m_LastTapReleaseTime = 0;
         }
 
-        private TapPhase m_CurrentTapPhase;
+        private ShakePhase m_CurrentTapPhase;
         private int m_CurrentswerveCount;
         private double m_CurrentTapStartTime;
         private double m_LastTapReleaseTime;
 
-        private enum TapPhase
+        private enum ShakePhase
         {
-            None,
+            WaitingForFirstSwerve,
             WaitingForNextRelease,
             // WaitingForNextPress,
+        }
+
+        private enum MoveDirection
+        {
+            None,
+            Left,
+            Right,
         }
     }
 
@@ -200,7 +227,7 @@ namespace UnityEngine.InputSystem.Interactions
                 "The amount of actuation a control requires before being considered pressed. If not set, default to "
                 + "'Default Button Press Point' in the global input settings.",
                 "Default Button Press Point",
-                () => target.mouseVelocityThreshold, v => target.mouseVelocityThreshold = v,
+                () => target.moveMagnitudeThreshold, v => target.moveMagnitudeThreshold = v,
                 () => InputSystem.settings.defaultButtonPressPoint);
         }
 

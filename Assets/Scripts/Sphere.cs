@@ -6,34 +6,34 @@ using UnityEngine.InputSystem;
 public class Sphere : MonoBehaviour
 {
     Rigidbody _sphere;
-    InputAction _fireAction;
-    InputAction _pointAction;
+    InputAction _attackAction;
     InputAction _bounceAction;
 
     // Start is called before the first frame update
     void Start()
     {
-        Debug.Log("Start sphere");
-        _fireAction = InputSystem.actions.FindAction("Attack");
-        _pointAction = InputSystem.actions.FindAction("Point");
+        _attackAction = InputSystem.actions.FindAction("Attack");
         _bounceAction = InputSystem.actions.FindAction("Bounce");
-        Debug.Log("Start sphere 2");
         _sphere = GetComponent<Rigidbody>();
     }
 
     // Update is called once per frame
     void Update()
     {
-        if (_fireAction.WasPressedThisFrame())
+        if (_attackAction.WasPressedThisFrame())
         {
-            Debug.Log("Attack action!");
             _sphere.AddForce(new Vector3(0, 150, 0));
         }
-        var point = _pointAction.ReadValue<Vector2>();
-        Debug.Log($"mouse   x: {point.x}   y: {point.y}");
+
+        var point = _bounceAction.ReadValue<Vector2>();
+        var distance = point.magnitude;
+        var angle = Mathf.Atan2(point.y, point.x);
+
+        // Debug.Log($"mouse   x: {point.x}   y: {point.y}");
+        Debug.Log($"distance: {distance}   angle: {angle * Mathf.Rad2Deg}");
         if (_bounceAction.WasPerformedThisFrame())
         {
-            Debug.Log("******************* Performed!");
+            // Debug.Log("******************* Performed!");
         }
     }
 

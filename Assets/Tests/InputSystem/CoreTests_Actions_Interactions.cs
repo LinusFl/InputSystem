@@ -1,3 +1,4 @@
+using System;
 using System.Linq;
 using NUnit.Framework;
 using UnityEngine;
@@ -486,6 +487,79 @@ internal partial class CoreTests
             Assert.That(trace, Canceled<HoldInteraction>(action, gamepad.buttonSouth, time: 11.5, duration: 1, value: 0.0));
         }
     }
+
+    /*
+    [Test]
+    [Category("Actions")]
+    public void Actions_CanPerformShakeInteraction()
+    {
+        const float moveMagnitudeThreshold = 10;
+        throw new ArgumentException($"Test 1");
+        var mouse = InputSystem.AddDevice<Mouse>();
+        var action = new InputAction(binding: "<Mouse>/delta", interactions: $"shake(moveMagnitudeThreshold={moveMagnitudeThreshold})");
+        action.Enable();
+
+        throw new ArgumentException($"Test 5");
+
+
+        using (var trace = new InputActionTrace(action))
+        {
+            // Move right.
+            var toRight = new Vector2(moveMagnitudeThreshold + 1, 0);
+            Debug.Log("Before 1");
+            Move(mouse.position, new Vector2(0, 0), time: 10);
+            Debug.Log("Before 2");
+            Move(mouse.position, new Vector2(moveMagnitudeThreshold + 1, 0), time: 10.1);
+            Debug.Log("Before 3");
+
+            Assert.That(trace, Started<ShakeMouseInteraction>(action, mouse.delta, time: 10, value: 1.0));
+            Assert.That(action.ReadValue<Vector2>(), Is.EqualTo(toRight));
+            Assert.That(action.phase, Is.EqualTo(InputActionPhase.Waiting));
+
+            trace.Clear();
+
+            //// Release in less than hold time.
+            //Release(gamepad.buttonSouth, time: 10.25);
+
+            //Assert.That(trace, Canceled<HoldInteraction>(action, gamepad.buttonSouth, duration: 0.25, time: 10.25, value: 0.0));
+            //Assert.That(action.phase, Is.EqualTo(InputActionPhase.Waiting));
+            //Assert.That(action.ReadValue<float>(), Is.Zero);
+
+            //trace.Clear();
+
+            //// Press again.
+            //Press(gamepad.buttonSouth, time: 10.5);
+
+            //Assert.That(trace, Started<HoldInteraction>(action, gamepad.buttonSouth, time: 10.5, value: 1.0));
+            //Assert.That(action.ReadValue<float>(), Is.EqualTo(1));
+            //Assert.That(action.phase, Is.EqualTo(InputActionPhase.Started));
+
+            //trace.Clear();
+
+            //// Let time pass but stay under hold time.
+            //currentTime = 10.75;
+            //InputSystem.Update();
+
+            //Assert.That(trace, Is.Empty);
+
+            //// Now exceed hold time. Make sure action performs and *stays* performed.
+            //currentTime = 11;
+            //InputSystem.Update();
+
+            //Assert.That(trace,
+            //    Performed<HoldInteraction>(action, gamepad.buttonSouth, time: 11, duration: 0.5, value: 1.0));
+            //Assert.That(action.phase, Is.EqualTo(InputActionPhase.Performed));
+            //Assert.That(action.ReadValue<float>(), Is.EqualTo(1));
+
+            //trace.Clear();
+
+            //// Release button.
+            //Release(gamepad.buttonSouth, time: 11.5);
+
+            //Assert.That(trace, Canceled<HoldInteraction>(action, gamepad.buttonSouth, time: 11.5, duration: 1, value: 0.0));
+        }
+    }
+    */
 
     // https://fogbugz.unity3d.com/f/cases/1346786/
     [Test]

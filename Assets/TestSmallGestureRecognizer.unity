@@ -377,6 +377,25 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 71a30741c4cde91409ce536e36955446, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
+  _sphere: {fileID: 0}
+  _attackAction:
+    m_Name: 
+    m_Type: 0
+    m_ExpectedControlType: 
+    m_Id: 43f672a9-da2d-48b6-86eb-f6987accfc44
+    m_Processors: 
+    m_Interactions: 
+    m_SingletonActionBindings: []
+    m_Flags: 0
+  _bounceAction:
+    m_Name: 
+    m_Type: 0
+    m_ExpectedControlType: 
+    m_Id: ca5d0e94-95c4-4928-8a83-c622aceba57b
+    m_Processors: 
+    m_Interactions: 
+    m_SingletonActionBindings: []
+    m_Flags: 0
 --- !u!54 &413862502
 Rigidbody:
   m_ObjectHideFlags: 0

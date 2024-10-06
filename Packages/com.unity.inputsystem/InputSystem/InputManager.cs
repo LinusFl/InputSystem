@@ -1966,6 +1966,7 @@ namespace UnityEngine.InputSystem
             interactions.AddTypeRegistration("SlowTap", typeof(SlowTapInteraction));
             interactions.AddTypeRegistration("MultiTap", typeof(MultiTapInteraction));
             interactions.AddTypeRegistration("Press", typeof(PressInteraction));
+            interactions.AddTypeRegistration("Shake", typeof(ShakeMouseInteraction));
 
             // Register composites.
             composites.AddTypeRegistration("1DAxis", typeof(AxisComposite));

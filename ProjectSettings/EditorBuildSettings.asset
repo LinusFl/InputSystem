@@ -8,4 +8,8 @@ EditorBuildSettings:
   - enabled: 1
     path: Assets/Tests/InputSystem/Assets/UITKTestScene.unity
     guid: f7924d25d4532204ea38efac326e8543
-  m_configObjects: {}
+  m_configObjects:
+    com.unity.input.settings: {fileID: 11400000, guid: 8218c9a3c57b76643853ff6021937713,
+      type: 2}
+    com.unity.input.settings.actions: {fileID: -944628639613478452, guid: 366c581fb9be5114f9a342d28db72592,
+      type: 3}

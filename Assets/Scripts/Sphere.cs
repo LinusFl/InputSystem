@@ -25,14 +25,15 @@ public class Sphere : MonoBehaviour
             _sphere.AddForce(new Vector3(0, 150, 0));
         }
 
-        var point = _bounceAction.ReadValue<Vector2>();
-        var distance = point.magnitude;
-        var angle = Mathf.Atan2(point.y, point.x);
+        //var point = _bounceAction.ReadValue<Vector2>();
+        //var distance = point.magnitude;
+        //var angle = Mathf.Atan2(point.y, point.x);
 
         // Debug.Log($"mouse   x: {point.x}   y: {point.y}");
-        Debug.Log($"distance: {distance}   angle: {angle * Mathf.Rad2Deg}");
+        // Debug.Log($"distance: {distance}   angle: {angle * Mathf.Rad2Deg}");
         if (_bounceAction.WasPerformedThisFrame())
         {
+            _sphere.AddForce(new Vector3(0, 100, 0));
             // Debug.Log("******************* Performed!");
         }
     }

@@ -55,7 +55,7 @@ namespace UnityEngine.InputSystem.Interactions
         /// How many taps need to be performed in succession. Two means double-tap, three means triple-tap, and so on.
         /// </remarks>
         [Tooltip("How many sudden changes of direction (swerves) need to be performed in succession.")]
-        public int swerveCount = 2;
+        public int swerveCount = 8;
 
         /// <summary>
         /// Direction velocity threshold that must be crossed for a direction angle to be valid
@@ -86,11 +86,16 @@ namespace UnityEngine.InputSystem.Interactions
         /// <inheritdoc />
         public void Process(ref InputInteractionContext context)
         {
-            return;
+            MoveDirection direction;
+
+            var now = context.time;
+            Debug.Log($"####### Process {m_CurrentTapPhase}");
+            Debug.Log($"####### Time: {now}  last:{m_LastTimeOfMove}  extra:{swerveTimeOrDefault}");
             if (context.timerHasExpired)
             {
                 // We use timers multiple times but no matter what, if they expire it means
                 // that we didn't get input in time.
+                Debug.Log("####### Will cancel");
                 context.Canceled();
                 Debug.Log("####### Canceled 1");
                 return;
@@ -99,91 +104,100 @@ namespace UnityEngine.InputSystem.Interactions
             switch (m_CurrentTapPhase)
             {
                 case ShakePhase.WaitingForFirstSwerve:
-                    IsMoveLarge(context.ReadValue<Vector2>(), out var direction);
-
-                    // if (context.ControlIsActuated(pressPointOrDefault))
+                    Debug.Log($"####### WaitingForFirstSwerve   lastDir: {m_LastDirection}");
+                    if (IsMoveLarge(context.ReadValue<Vector2>(), out direction) &&
+                        direction != MoveDirection.None)
                     {
-                        m_CurrentTapPhase = ShakePhase.WaitingForNextRelease;
-                        m_CurrentTapStartTime = context.time;
-                        context.Started();
-                        var value = context.ReadValue<Vector2>();
-                        // Debug.Log("####### Started");
+                        //var now = context.time;
 
-                        var maxTapTime = swerveTimeOrDefault;
-                        var maxDelayInBetween = swerveDelayOrDefault;
-                        context.SetTimeout(maxTapTime);
-
-                        // We'll be using multiple timeouts so set a total completion time that
-                        // effects the result of InputAction.GetTimeoutCompletionPercentage()
-                        // such that it accounts for the total time we allocate for the interaction
-                        // rather than only the time of one single timeout.
-                        context.SetTotalTimeoutCompletionTime(maxTapTime * swerveCount + (swerveCount - 1) * maxDelayInBetween);
+                        if (direction != m_LastDirection &&
+                            m_LastDirection != MoveDirection.None &&
+                            now < m_LastTimeOfMove + swerveTimeOrDefault)
+                        {
+                            m_SwerveCount = 1;
+                            Debug.Log($"####### Detected the first swerve (count = {m_SwerveCount}) delay: {swerveDelayOrDefault}");
+                            m_CurrentTapPhase = ShakePhase.WaitingForAnotherSwerve;
+                            context.Started();
+                            context.SetTimeout(swerveDelayOrDefault);
+                        }
+                        else
+                            Debug.Log($"####### No detection lastDir: {m_LastDirection})");
+                        m_LastDirection = direction;
+                        m_LastTimeOfMove = context.time;
                     }
+
+                    // We'll be using multiple timeouts so set a total completion time that
+                    // effects the result of InputAction.GetTimeoutCompletionPercentage()
+                    // such that it accounts for the total time we allocate for the interaction
+                    // rather than only the time of one single timeout.
+
+                    // context.SetTotalTimeoutCompletionTime(maxTapTime * swerveCount + (swerveCount - 1) * maxDelayInBetween);
                     break;
 
-                case ShakePhase.WaitingForNextRelease:
-                    // if (!context.ControlIsActuated(releasePointOrDefault))
+                case ShakePhase.WaitingForAnotherSwerve:
+                    Debug.Log($"####### WaitingForAnotherSwerve   lastDir: {m_LastDirection}");
+
+                    if (IsMoveLarge(context.ReadValue<Vector2>(), out direction) &&
+                        direction != MoveDirection.None)
                     {
-                        if (context.time - m_CurrentTapStartTime <= swerveTimeOrDefault)
+                        // var now = context.time;
+
+                        // Debug.Log($"####### Time: {now}  last:{m_LastTimeOfMove}  extra:{swerveTimeOrDefault}");
+                        if (direction != m_LastDirection &&
+                            m_LastDirection != MoveDirection.None &&
+                            now < m_LastTimeOfMove + swerveTimeOrDefault)
                         {
-                            ++m_CurrentswerveCount;
-                            if (m_CurrentswerveCount >= swerveCount)
+                            if (++m_SwerveCount >= swerveCount)
                             {
+                                Debug.Log($"####### Detected the last swerve ({m_SwerveCount} of {swerveCount})");
+                                //m_CurrentTapPhase = ShakePhase.WaitingForFirstSwerve;
+                                //m_LastDirection = MoveDirection.None;
                                 context.Performed();
-                                // Debug.Log("####### Performed");
                             }
                             else
                             {
-                                m_CurrentTapPhase = ShakePhase.WaitingForNextRelease;
-                                m_LastTapReleaseTime = context.time;
+                                Debug.Log($"####### Detected another swerve (count = {m_SwerveCount})");
                                 context.SetTimeout(swerveDelayOrDefault);
                             }
                         }
-                        else
-                        {
-                            context.Canceled();
-                            Debug.Log("####### Canceled 2");
-                        }
+                        m_LastDirection = direction;
+                        m_LastTimeOfMove = context.time;
                     }
+                    else
+                        Debug.Log($"####### End of WaitingForAnotherSwerve");
                     break;
-
-                //case TapPhase.WaitingForNextPress:
-                //    if (context.ControlIsActuated(pressPointOrDefault))
-                //    {
-                //        if (context.time - m_LastTapReleaseTime <= swerveDelayOrDefault)
-                //        {
-                //            m_CurrentTapPhase = TapPhase.WaitingForNextRelease;
-                //            m_CurrentTapStartTime = context.time;
-                //            context.SetTimeout(swerveTimeOrDefault);
-                //        }
-                //        else
-                //        {
-                //            context.Canceled();
-                //        }
-                //    }
-                //    break;
             }
-        }
-
-        private bool IsMoveLarge(Vector2 delta, out MoveDirection direction)
-        {
-            if (delta.magnitude > moveMagnitudeThreshold)
-            {
-                direction = MoveDirection.Right;
-                return true;
-            }
-            direction = MoveDirection.None;
-            return false;
+            Debug.Log($"####### End of Process");
         }
 
         /// <inheritdoc />
         public void Reset()
         {
-            return;
+            Debug.Log($"WWWWWWWWWW  Reset");
             m_CurrentTapPhase = ShakePhase.WaitingForFirstSwerve;
             m_CurrentswerveCount = 0;
             m_CurrentTapStartTime = 0;
             m_LastTapReleaseTime = 0;
+        }
+
+        private bool IsMoveLarge(Vector2 delta, out MoveDirection direction)
+        {
+            Debug.Log($"Delta: x:{delta.x}  y:{delta.y}     magnitude: {delta.magnitude}  threshold: {moveMagnitudeThreshold}");
+
+            direction = MoveDirection.None;
+            if (delta.magnitude > moveMagnitudeThreshold)
+            {
+                const float sqrt3div3 = 0.577f;  // sqrt(3) / 3, tan(30)
+
+                if (delta.x > 0 && Math.Abs(delta.y) < delta.x * sqrt3div3)             // < 30 degrees to y-axis
+                    direction = MoveDirection.Right;
+                else if (delta.x < 0 && Math.Abs(delta.y) < (-delta.x) * sqrt3div3)
+                    direction = MoveDirection.Left;
+
+                Debug.Log($"Direction: {direction}");
+                return true;
+            }
+            return false;
         }
 
         private ShakePhase m_CurrentTapPhase;
@@ -191,10 +205,14 @@ namespace UnityEngine.InputSystem.Interactions
         private double m_CurrentTapStartTime;
         private double m_LastTapReleaseTime;
 
+        private MoveDirection m_LastDirection = MoveDirection.None;
+        private double m_LastTimeOfMove;
+        private int m_SwerveCount;
+
         private enum ShakePhase
         {
             WaitingForFirstSwerve,
-            WaitingForNextRelease,
+            WaitingForAnotherSwerve,
             // WaitingForNextPress,
         }
 

@@ -488,33 +488,40 @@ internal partial class CoreTests
         }
     }
 
-    /*
     [Test]
     [Category("Actions")]
     public void Actions_CanPerformShakeInteraction()
     {
         const float moveMagnitudeThreshold = 10;
-        throw new ArgumentException($"Test 1");
         var mouse = InputSystem.AddDevice<Mouse>();
-        var action = new InputAction(binding: "<Mouse>/delta", interactions: $"shake(moveMagnitudeThreshold={moveMagnitudeThreshold})");
+        var action = new InputAction(interactions: "shake"); //(binding: "<Mouse>/leftButton", interactions: $"tap");
+
+        action.AddBinding("<Mouse>/delta");
         action.Enable();
 
-        throw new ArgumentException($"Test 5");
-
+        Debug.Log($"Action: {action} bindings:{string.Join(' ', action.bindings)} interactions: {action.interactions}");
 
         using (var trace = new InputActionTrace(action))
         {
-            // Move right.
             var toRight = new Vector2(moveMagnitudeThreshold + 1, 0);
+            var toLeft= new Vector2(- moveMagnitudeThreshold - 1, 0);
+
+            Assert.That(action.phase, Is.EqualTo(InputActionPhase.Waiting));
+
+            // Move right.
             Debug.Log("Before 1");
-            Move(mouse.position, new Vector2(0, 0), time: 10);
+            Move(mouse.position, Vector2.zero, toRight, time: 10);
+            Move(mouse.position, Vector2.zero, toLeft,  time: 10.05);
+            Move(mouse.position, Vector2.zero, toRight, time: 10.10);
+            Move(mouse.position, Vector2.zero, toLeft,  time: 10.15);
             Debug.Log("Before 2");
-            Move(mouse.position, new Vector2(moveMagnitudeThreshold + 1, 0), time: 10.1);
+            //Move(mouse.position, new Vector2(200, 200), new Vector2(moveMagnitudeThreshold + 1, 5), time: 10.1);
             Debug.Log("Before 3");
 
-            Assert.That(trace, Started<ShakeMouseInteraction>(action, mouse.delta, time: 10, value: 1.0));
-            Assert.That(action.ReadValue<Vector2>(), Is.EqualTo(toRight));
-            Assert.That(action.phase, Is.EqualTo(InputActionPhase.Waiting));
+            Assert.That(action.phase, Is.EqualTo(InputActionPhase.Started));
+            // Assert.That(trace, Started<ShakeMouseInteraction>(action, mouse.delta, time: 10.05, value: toLeft));
+            Assert.That(action.ReadValue<Vector2>(), Is.EqualTo(toLeft));
+            Assert.That(action.phase, Is.EqualTo(InputActionPhase.Started));
 
             trace.Clear();
 
@@ -559,7 +566,6 @@ internal partial class CoreTests
             //Assert.That(trace, Canceled<HoldInteraction>(action, gamepad.buttonSouth, time: 11.5, duration: 1, value: 0.0));
         }
     }
-    */
 
     // https://fogbugz.unity3d.com/f/cases/1346786/
     [Test]

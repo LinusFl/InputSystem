@@ -33,7 +33,7 @@ I had some hurdles on the way, for example:
 * For action triggering I wanted to use event triggering in Player Input but it did not work for me so I switched to do it on update instead.
 * I tried to get the performed signal mapped to a button in another action (use an action as input to another), but eventually that did not seem possible.
 * From the start I, for some strange reason, used the DebugView tool to look at log output. That worked well for logs in game object start but not for those in update. This also caused me confusion. The normal unity console works fine of course, I should have used from the start...
-* The biggest hurdle was an exception that suddenly started to appear ("Attempted to set property InputSystem.actions during Play-mode which is not supported. Assigning this property is only allowed in Edit-mode."). Eventually I got rid of it after first switching to InputSystem version 7.0 (which caused errors) and then back to 1.11.2. Later on I got the problem back and instead patched InputSystem.cs (see file list above).
+* The biggest hurdle was an exception that suddenly started to appear when running unit tests ("Attempted to set property InputSystem.actions during Play-mode which is not supported. Assigning this property is only allowed in Edit-mode."). Eventually I got rid of it after first switching to InputSystem version 7.0 (which caused errors) and then back to 1.11.2. Later on I got the problem back and instead patched InputSystem.cs (see file list above).
 
 
 If I had more time to work on this I would:

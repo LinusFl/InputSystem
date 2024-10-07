@@ -81,14 +81,12 @@ namespace UnityEngine.InputSystem.Interactions
                 // We use timers multiple times but no matter what, if they expire it means
                 // that we didn't get input in time.
                 context.Canceled();
-                //Debug.Log("####### Canceled");
                 return;
             }
 
             switch (m_CurrentShakePhase)
             {
                 case ShakePhase.WaitingForFirstSwerve:
-                    //Debug.Log($"####### WaitingForFirstSwerve   lastDir: {m_LastDirection}");
                     if (IsMoveSwift(context.ReadValue<Vector2>(), out direction) &&
                         direction != MoveDirection.None)
                     {
@@ -99,13 +97,10 @@ namespace UnityEngine.InputSystem.Interactions
                             now < m_LastTimeOfMove + swerveTimeOrDefault)
                         {
                             m_CurrentSwerveCount = 1;
-                            //Debug.Log($"####### Detected the first swerve (count = {m_CurrentSwerveCount}) delay: {swerveDelayOrDefault}");
                             m_CurrentShakePhase = ShakePhase.WaitingForAnotherSwerve;
                             context.Started();
                             context.SetTimeout(swerveDelayOrDefault);
                         }
-                        //else
-                        //  Debug.Log($"####### No detection lastDir: {m_LastDirection})");
                         m_LastDirection = direction;
                         m_LastTimeOfMove = now;
                     }
@@ -119,8 +114,6 @@ namespace UnityEngine.InputSystem.Interactions
                     break;
 
                 case ShakePhase.WaitingForAnotherSwerve:
-                    //Debug.Log($"####### WaitingForAnotherSwerve   lastDir: {m_LastDirection}");
-
                     if (IsMoveSwift(context.ReadValue<Vector2>(), out direction) &&
                         direction != MoveDirection.None)
                     {
@@ -131,15 +124,9 @@ namespace UnityEngine.InputSystem.Interactions
                             now < m_LastTimeOfMove + swerveTimeOrDefault)
                         {
                             if (++m_CurrentSwerveCount >= swerveCountOrDefault)
-                            {
-                                //Debug.Log($"####### Detected the last swerve ({m_CurrentSwerveCount} of {swerveCountOrDefault})");
                                 context.Performed();
-                            }
                             else
-                            {
-                                //Debug.Log($"####### Detected another swerve (count = {m_CurrentSwerveCount})");
                                 context.SetTimeout(swerveDelayOrDefault);
-                            }
                         }
                         m_LastDirection = direction;
                         m_LastTimeOfMove = now;
@@ -159,19 +146,16 @@ namespace UnityEngine.InputSystem.Interactions
 
         private bool IsMoveSwift(Vector2 delta, out MoveDirection direction)
         {
-            //Debug.Log($"Delta: x:{delta.x}  y:{delta.y}     magnitude: {delta.magnitude}  threshold: {moveMagnitudeThresholdOrDefault}");
-
             direction = MoveDirection.None;
             if (delta.magnitude > moveMagnitudeThresholdOrDefault)
             {
-                const float sqrt3div3 = 0.577f;  // sqrt(3) / 3, tan(30)
+                const float sqrt3div3 = 0.577f;     // sqrt(3) / 3, tan(30)
 
-                if (delta.x > 0 && Math.Abs(delta.y) < delta.x * sqrt3div3)             // < 30 degrees to y-axis
+                if (delta.x > 0 && Math.Abs(delta.y) < delta.x * sqrt3div3)     // < 30 degrees to y-axis
                     direction = MoveDirection.Right;
                 else if (delta.x < 0 && Math.Abs(delta.y) < (-delta.x) * sqrt3div3)
                     direction = MoveDirection.Left;
 
-                //Debug.Log($"Direction: {direction}");
                 return true;
             }
             return false;

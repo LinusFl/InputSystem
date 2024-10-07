@@ -494,12 +494,10 @@ internal partial class CoreTests
     {
         const float moveMagnitudeThreshold = 10;
         var mouse = InputSystem.AddDevice<Mouse>();
-        var action = new InputAction(interactions: "shake"); //(binding: "<Mouse>/leftButton", interactions: $"tap");
+        var action = new InputAction(interactions: "shake");
 
         action.AddBinding("<Mouse>/delta");
         action.Enable();
-
-        Debug.Log($"Action: {action} bindings:{string.Join(' ', action.bindings)} interactions: {action.interactions}");
 
         using (var trace = new InputActionTrace(action))
         {
@@ -508,62 +506,63 @@ internal partial class CoreTests
 
             Assert.That(action.phase, Is.EqualTo(InputActionPhase.Waiting));
 
-            // Move right.
-            Debug.Log("Before 1");
-            Move(mouse.position, Vector2.zero, toRight, time: 10);
-            Move(mouse.position, Vector2.zero, toLeft,  time: 10.05);
-            Move(mouse.position, Vector2.zero, toRight, time: 10.10);
-            Move(mouse.position, Vector2.zero, toLeft,  time: 10.15);
-            Debug.Log("Before 2");
-            //Move(mouse.position, new Vector2(200, 200), new Vector2(moveMagnitudeThreshold + 1, 5), time: 10.1);
-            Debug.Log("Before 3");
+            trace.Clear();
 
-            Assert.That(action.phase, Is.EqualTo(InputActionPhase.Started));
-            // Assert.That(trace, Started<ShakeMouseInteraction>(action, mouse.delta, time: 10.05, value: toLeft));
-            Assert.That(action.ReadValue<Vector2>(), Is.EqualTo(toLeft));
-            Assert.That(action.phase, Is.EqualTo(InputActionPhase.Started));
+            Move(mouse.position, Vector2.zero, toRight, time: 10);
+
+            // One swift mouse move is not enough to start, so still in waiting
+            Assert.That(action.phase, Is.EqualTo(InputActionPhase.Waiting));
 
             trace.Clear();
 
-            //// Release in less than hold time.
-            //Release(gamepad.buttonSouth, time: 10.25);
+            Move(mouse.position, Vector2.zero, toLeft,  time: 10.05);
 
-            //Assert.That(trace, Canceled<HoldInteraction>(action, gamepad.buttonSouth, duration: 0.25, time: 10.25, value: 0.0));
-            //Assert.That(action.phase, Is.EqualTo(InputActionPhase.Waiting));
-            //Assert.That(action.ReadValue<float>(), Is.Zero);
+            // Two swift moves in opposite directions within swerve time will start the interaction
+            Assert.That(trace, Started<ShakeMouseInteraction>(action, mouse.delta, time: 10.05, value: toLeft));
+            Assert.That(action.ReadValue<Vector2>(), Is.EqualTo(toLeft));
 
-            //trace.Clear();
+            trace.Clear();
 
-            //// Press again.
-            //Press(gamepad.buttonSouth, time: 10.5);
+            Move(mouse.position, Vector2.zero, toRight, time: 10.10);
 
-            //Assert.That(trace, Started<HoldInteraction>(action, gamepad.buttonSouth, time: 10.5, value: 1.0));
-            //Assert.That(action.ReadValue<float>(), Is.EqualTo(1));
-            //Assert.That(action.phase, Is.EqualTo(InputActionPhase.Started));
+            Assert.That(action.ReadValue<Vector2>(), Is.EqualTo(toRight));
 
-            //trace.Clear();
+            trace.Clear();
 
-            //// Let time pass but stay under hold time.
-            //currentTime = 10.75;
-            //InputSystem.Update();
+            Move(mouse.position, Vector2.zero, toLeft,  time: 10.15);
 
-            //Assert.That(trace, Is.Empty);
+            Assert.That(action.ReadValue<Vector2>(), Is.EqualTo(toLeft));
 
-            //// Now exceed hold time. Make sure action performs and *stays* performed.
-            //currentTime = 11;
-            //InputSystem.Update();
+            trace.Clear();
 
-            //Assert.That(trace,
-            //    Performed<HoldInteraction>(action, gamepad.buttonSouth, time: 11, duration: 0.5, value: 1.0));
-            //Assert.That(action.phase, Is.EqualTo(InputActionPhase.Performed));
-            //Assert.That(action.ReadValue<float>(), Is.EqualTo(1));
+            Move(mouse.position, Vector2.zero, toRight, time: 10.20);
 
-            //trace.Clear();
+            Assert.That(action.ReadValue<Vector2>(), Is.EqualTo(toRight));
 
-            //// Release button.
-            //Release(gamepad.buttonSouth, time: 11.5);
+            trace.Clear();
 
-            //Assert.That(trace, Canceled<HoldInteraction>(action, gamepad.buttonSouth, time: 11.5, duration: 1, value: 0.0));
+            Move(mouse.position, Vector2.zero, toLeft,  time: 10.25);
+
+            Assert.That(action.ReadValue<Vector2>(), Is.EqualTo(toLeft));
+
+            trace.Clear();
+
+            Move(mouse.position, Vector2.zero, toRight, time: 10.30);
+
+            Assert.That(action.ReadValue<Vector2>(), Is.EqualTo(toRight));
+
+            trace.Clear();
+
+            Move(mouse.position, Vector2.zero, toLeft,  time: 10.35);
+
+            Assert.That(action.ReadValue<Vector2>(), Is.EqualTo(toLeft));
+
+            trace.Clear();
+
+            Move(mouse.position, Vector2.zero, toRight, time: 10.40);
+
+            // After eight consecutive moves the interaction should be performed
+            Assert.That(trace, Performed<ShakeMouseInteraction>(action, mouse.delta, time: 10.40, value: toRight));
         }
     }
 

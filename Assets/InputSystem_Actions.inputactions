@@ -486,7 +486,7 @@
                     "name": "",
                     "id": "6c25c510-c609-4a9b-adca-e1248ea6c483",
                     "path": "<Mouse>/delta",
-                    "interactions": "Shake",
+                    "interactions": "",
                     "processors": "",
                     "groups": "",
                     "action": "Bounce",

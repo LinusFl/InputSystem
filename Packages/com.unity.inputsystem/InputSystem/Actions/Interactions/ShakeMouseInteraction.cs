@@ -1,37 +1,35 @@
 using System;
-using UnityEngine.InputSystem.Controls;
-using UnityEngine.Scripting;
-using System.Drawing.Text;
-using UnityEditor.Experimental.GraphView;
 
 
 #if UNITY_EDITOR
 using UnityEditor;
+using UnityEngine.EventSystems;
 using UnityEngine.InputSystem.Editor;
 using UnityEngine.UIElements;
-using UnityEditor.UIElements;
 #endif
 
 namespace UnityEngine.InputSystem.Interactions
 {
     /// <summary>
-    /// Interaction that requires multiple taps (press and release within <see cref="tapTime"/>) spaced no more
-    /// than <see cref="tapDelay"/> seconds apart. This equates to a chain of <see cref="TapInteraction"/> with
-    /// a maximum delay between each tap.
+    /// Interaction that requires multiple swerves (swift move from right to left, or left to right, with the mouse).
+    /// One swerve need to be done within <see cref="swerveTime"/>) spaced no more than <see cref="swerveDelay"/>
+    /// seconds apart. This equates to a chain of <see cref="ShakeMouseInteraction"/> with a maximum delay between each swerve.
     /// </summary>
     /// <remarks>
-    /// The interaction goes into <see cref="InputActionPhase.Started"/> on the first press and then will not
-    /// trigger again until either the full tap sequence is performed (in which case the interaction triggers
-    /// <see cref="InputActionPhase.Performed"/>) or the multi-tap is aborted by a timeout being hit (in which
-    /// case the interaction will trigger <see cref="InputActionPhase.Canceled"/>).
+    /// The interaction goes into <see cref="InputActionPhase.Started"/> when two swift moves in opposite directions are detected.
+    /// It will remain processing mouse updates continously in <see cref="InputActionPhase.Waiting"/>.
+    /// After detecting <see cref="swerveCount"/> swerves in a row it will trigger <see cref="InputActionPhase.Performed"/>.
+    /// If any wait times out the interaction is aborted and <see cref="InputActionPhase.Canceled"/> will be triggered.
     /// </remarks>
     public class ShakeMouseInteraction : IInputInteraction<Vector2>
     {
         public const float DefaultSwerveTime = 0.2f;
         public const float DefaultSwerveDelay = 0.8f;
+        public const float DefaultMoveMagnitudeThreshold = 0.1f;
+        public const int DefaultSwerveCount = 8;
 
         /// <summary>
-        /// The time in seconds within which the control needs to be pressed and released to perform the interaction.
+        /// The time in seconds within which a swift left and right move needs to be done to detect a swerve.
         /// </summary>
         /// <remarks>
         /// If this value is equal to or smaller than zero, the input system will use (<see cref="DefaultSwerveTime"/>) instead.
@@ -40,7 +38,7 @@ namespace UnityEngine.InputSystem.Interactions
         public float swerveTime;
 
         /// <summary>
-        /// The time in seconds within which the control needs to be pressed and released to perform the interaction.
+        /// The time in seconds within which any new swerve needs to be detected to continue the interaction.
         /// </summary>
         /// <remarks>
         /// If this value is equal to or smaller than zero, the input system will use (<see cref="DefaultSwerveDelay"/>) instead.
@@ -49,81 +47,67 @@ namespace UnityEngine.InputSystem.Interactions
         public float swerveDelay;
 
         /// <summary>
-        /// The number of taps required to perform the interaction.
+        /// The number of sweves required to perform the interaction.
         /// </summary>
         /// <remarks>
-        /// How many taps need to be performed in succession. Two means double-tap, three means triple-tap, and so on.
+        /// How many swerves need to be done in succession (<see cref="DefaultSwerveCount"/>).
         /// </remarks>
-        [Tooltip("How many sudden changes of direction (swerves) need to be performed in succession.")]
-        public int swerveCount = 8;
+        [Tooltip("How many swift changes of direction (swerves) need to be performed in succession.")]
+        public int swerveCount;
 
         /// <summary>
-        /// Direction velocity threshold that must be crossed for a direction angle to be valid
+        /// Direction velocity threshold that must be crossed for a move to be considered
         /// </summary>
         /// <remarks>
-        /// If this is less than or equal to 0 (the default), <see cref="InputSettings.defaultButtonPressPoint"/> is used instead.
+        /// If this is less than or equal to 0 (the default), <see cref="DefaultMoveMagnitudeThreshold"/> is used instead.
         /// </remarks>
         [Tooltip("Direction velocity threshold that must be crossed for a direction angle to be valid.")]
         public float moveMagnitudeThreshold;
 
-        /// <summary>
-        /// Number of direction regions for registering a change of direction
-        /// </summary>
-        /// <remarks>
-        /// If this is less than or equal to 0 (the default), <see cref="InputSettings.defaultButtonPressPoint"/> is used instead.
-        /// </remarks>
-        [Tooltip("Direction velocity threshold that must be crossed for a direction angle to be valid.")]
-        public int numberOfDirectionRegions;
 
         private float swerveTimeOrDefault => swerveTime > 0.0 ? swerveTime : DefaultSwerveTime;
         private float swerveDelayOrDefault => swerveDelay > 0.0 ? swerveDelay : DefaultSwerveDelay;
+        private float swerveCountOrDefault => swerveCount > 0.0 ? swerveCount : DefaultSwerveCount;
+        private float moveMagnitudeThresholdOrDefault => moveMagnitudeThreshold > 0.0 ? moveMagnitudeThreshold : DefaultMoveMagnitudeThreshold;
 
-
-        // ToDo: Remove
-        private float pressPointOrDefault => 1.0f; // pressPoint > 0 ? pressPoint : ButtonControl.s_GlobalDefaultButtonPressPoint;
-        private float releasePointOrDefault => 1.0f; // pressPointOrDefault * ButtonControl.s_GlobalDefaultButtonReleaseThreshold;
 
         /// <inheritdoc />
         public void Process(ref InputInteractionContext context)
         {
             MoveDirection direction;
 
-            var now = context.time;
-            Debug.Log($"####### Process {m_CurrentTapPhase}");
-            Debug.Log($"####### Time: {now}  last:{m_LastTimeOfMove}  extra:{swerveTimeOrDefault}");
             if (context.timerHasExpired)
             {
                 // We use timers multiple times but no matter what, if they expire it means
                 // that we didn't get input in time.
-                Debug.Log("####### Will cancel");
                 context.Canceled();
-                Debug.Log("####### Canceled 1");
+                //Debug.Log("####### Canceled");
                 return;
             }
 
-            switch (m_CurrentTapPhase)
+            switch (m_CurrentShakePhase)
             {
                 case ShakePhase.WaitingForFirstSwerve:
-                    Debug.Log($"####### WaitingForFirstSwerve   lastDir: {m_LastDirection}");
-                    if (IsMoveLarge(context.ReadValue<Vector2>(), out direction) &&
+                    //Debug.Log($"####### WaitingForFirstSwerve   lastDir: {m_LastDirection}");
+                    if (IsMoveSwift(context.ReadValue<Vector2>(), out direction) &&
                         direction != MoveDirection.None)
                     {
-                        //var now = context.time;
+                        var now = context.time;
 
                         if (direction != m_LastDirection &&
                             m_LastDirection != MoveDirection.None &&
                             now < m_LastTimeOfMove + swerveTimeOrDefault)
                         {
-                            m_SwerveCount = 1;
-                            Debug.Log($"####### Detected the first swerve (count = {m_SwerveCount}) delay: {swerveDelayOrDefault}");
-                            m_CurrentTapPhase = ShakePhase.WaitingForAnotherSwerve;
+                            m_CurrentSwerveCount = 1;
+                            //Debug.Log($"####### Detected the first swerve (count = {m_CurrentSwerveCount}) delay: {swerveDelayOrDefault}");
+                            m_CurrentShakePhase = ShakePhase.WaitingForAnotherSwerve;
                             context.Started();
                             context.SetTimeout(swerveDelayOrDefault);
                         }
-                        else
-                            Debug.Log($"####### No detection lastDir: {m_LastDirection})");
+                        //else
+                        //  Debug.Log($"####### No detection lastDir: {m_LastDirection})");
                         m_LastDirection = direction;
-                        m_LastTimeOfMove = context.time;
+                        m_LastTimeOfMove = now;
                     }
 
                     // We'll be using multiple timeouts so set a total completion time that
@@ -131,61 +115,54 @@ namespace UnityEngine.InputSystem.Interactions
                     // such that it accounts for the total time we allocate for the interaction
                     // rather than only the time of one single timeout.
 
-                    // context.SetTotalTimeoutCompletionTime(maxTapTime * swerveCount + (swerveCount - 1) * maxDelayInBetween);
+                    // context.SetTotalTimeoutCompletionTime(swerveTime * swerveCountOrDefault + (swerveCountOrDefault - 1) * swerveDelay);
                     break;
 
                 case ShakePhase.WaitingForAnotherSwerve:
-                    Debug.Log($"####### WaitingForAnotherSwerve   lastDir: {m_LastDirection}");
+                    //Debug.Log($"####### WaitingForAnotherSwerve   lastDir: {m_LastDirection}");
 
-                    if (IsMoveLarge(context.ReadValue<Vector2>(), out direction) &&
+                    if (IsMoveSwift(context.ReadValue<Vector2>(), out direction) &&
                         direction != MoveDirection.None)
                     {
-                        // var now = context.time;
+                        var now = context.time;
 
-                        // Debug.Log($"####### Time: {now}  last:{m_LastTimeOfMove}  extra:{swerveTimeOrDefault}");
                         if (direction != m_LastDirection &&
                             m_LastDirection != MoveDirection.None &&
                             now < m_LastTimeOfMove + swerveTimeOrDefault)
                         {
-                            if (++m_SwerveCount >= swerveCount)
+                            if (++m_CurrentSwerveCount >= swerveCountOrDefault)
                             {
-                                Debug.Log($"####### Detected the last swerve ({m_SwerveCount} of {swerveCount})");
-                                //m_CurrentTapPhase = ShakePhase.WaitingForFirstSwerve;
-                                //m_LastDirection = MoveDirection.None;
+                                //Debug.Log($"####### Detected the last swerve ({m_CurrentSwerveCount} of {swerveCountOrDefault})");
                                 context.Performed();
                             }
                             else
                             {
-                                Debug.Log($"####### Detected another swerve (count = {m_SwerveCount})");
+                                //Debug.Log($"####### Detected another swerve (count = {m_CurrentSwerveCount})");
                                 context.SetTimeout(swerveDelayOrDefault);
                             }
                         }
                         m_LastDirection = direction;
-                        m_LastTimeOfMove = context.time;
+                        m_LastTimeOfMove = now;
                     }
-                    else
-                        Debug.Log($"####### End of WaitingForAnotherSwerve");
                     break;
             }
-            Debug.Log($"####### End of Process");
         }
 
         /// <inheritdoc />
         public void Reset()
         {
-            Debug.Log($"WWWWWWWWWW  Reset");
-            m_CurrentTapPhase = ShakePhase.WaitingForFirstSwerve;
-            m_CurrentswerveCount = 0;
-            m_CurrentTapStartTime = 0;
-            m_LastTapReleaseTime = 0;
+            m_CurrentShakePhase = ShakePhase.WaitingForFirstSwerve;
+            m_CurrentSwerveCount = 0;
+            m_LastDirection = MoveDirection.None;
+            m_LastTimeOfMove = 0;
         }
 
-        private bool IsMoveLarge(Vector2 delta, out MoveDirection direction)
+        private bool IsMoveSwift(Vector2 delta, out MoveDirection direction)
         {
-            Debug.Log($"Delta: x:{delta.x}  y:{delta.y}     magnitude: {delta.magnitude}  threshold: {moveMagnitudeThreshold}");
+            //Debug.Log($"Delta: x:{delta.x}  y:{delta.y}     magnitude: {delta.magnitude}  threshold: {moveMagnitudeThresholdOrDefault}");
 
             direction = MoveDirection.None;
-            if (delta.magnitude > moveMagnitudeThreshold)
+            if (delta.magnitude > moveMagnitudeThresholdOrDefault)
             {
                 const float sqrt3div3 = 0.577f;  // sqrt(3) / 3, tan(30)
 
@@ -194,26 +171,21 @@ namespace UnityEngine.InputSystem.Interactions
                 else if (delta.x < 0 && Math.Abs(delta.y) < (-delta.x) * sqrt3div3)
                     direction = MoveDirection.Left;
 
-                Debug.Log($"Direction: {direction}");
+                //Debug.Log($"Direction: {direction}");
                 return true;
             }
             return false;
         }
 
-        private ShakePhase m_CurrentTapPhase;
-        private int m_CurrentswerveCount;
-        private double m_CurrentTapStartTime;
-        private double m_LastTapReleaseTime;
-
+        private ShakePhase m_CurrentShakePhase;
         private MoveDirection m_LastDirection = MoveDirection.None;
         private double m_LastTimeOfMove;
-        private int m_SwerveCount;
+        private int m_CurrentSwerveCount;
 
         private enum ShakePhase
         {
             WaitingForFirstSwerve,
             WaitingForAnotherSwerve,
-            // WaitingForNextPress,
         }
 
         private enum MoveDirection
@@ -230,39 +202,43 @@ namespace UnityEngine.InputSystem.Interactions
     /// </summary>
     internal class ShakeMouseInteractionEditor : InputParameterEditor<ShakeMouseInteraction>
     {
-        protected override void OnEnable()
-        {
-            m_TapTimeSetting.Initialize("Max Tap Duration",
-                "Time (in seconds) within with a control has to be released again for it to register as a tap. If the control is held "
-                + "for longer than this time, the tap is canceled.",
-                "Default Tap Time",
-                () => target.swerveTime, x => target.swerveTime = x, () => ShakeMouseInteraction.DefaultSwerveTime);
-            m_TapDelaySetting.Initialize("Max Tap Spacing",
-                "The maximum delay (in seconds) allowed between each tap. If this time is exceeded, the multi-tap is canceled.",
-                "Default Tap Spacing",
-                () => target.swerveDelay, x => target.swerveDelay = x, () => InputSystem.settings.multiTapDelayTime);
-            m_PressPointSetting.Initialize("Press Point",
-                "The amount of actuation a control requires before being considered pressed. If not set, default to "
-                + "'Default Button Press Point' in the global input settings.",
-                "Default Button Press Point",
-                () => target.moveMagnitudeThreshold, v => target.moveMagnitudeThreshold = v,
-                () => InputSystem.settings.defaultButtonPressPoint);
-        }
-
         public override void OnGUI()
         {
 #if UNITY_INPUT_SYSTEM_PROJECT_WIDE_ACTIONS
             if (!InputSystem.settings.IsFeatureEnabled(InputFeatureNames.kUseIMGUIEditorForAssets)) return;
 #endif
+            target.swerveTime = EditorGUILayout.FloatField(m_swerveTimeLabel, target.swerveTime);
+            target.swerveDelay = EditorGUILayout.FloatField(m_swerveDelayLabel, target.swerveDelay);
             target.swerveCount = EditorGUILayout.IntField(m_swerveCountLabel, target.swerveCount);
-            m_TapDelaySetting.OnGUI();
-            m_TapTimeSetting.OnGUI();
-            m_PressPointSetting.OnGUI();
         }
 
 #if UNITY_INPUT_SYSTEM_PROJECT_WIDE_ACTIONS
         public override void OnDrawVisualElements(VisualElement root, Action onChangedCallback)
         {
+            var swerveTimeField = new FloatField(m_swerveTimeLabel.text)
+            {
+                value = target.swerveTime,
+                tooltip = m_swerveTimeLabel.tooltip
+            };
+            swerveTimeField.RegisterValueChangedCallback(evt =>
+            {
+                target.swerveTime = evt.newValue;
+                onChangedCallback?.Invoke();
+            });
+            root.Add(swerveTimeField);
+
+            var swerveDelayField = new FloatField(m_swerveDelayLabel.text)
+            {
+                value = target.swerveDelay,
+                tooltip = m_swerveDelayLabel.tooltip
+            };
+            swerveDelayField.RegisterValueChangedCallback(evt =>
+            {
+                target.swerveDelay = evt.newValue;
+                onChangedCallback?.Invoke();
+            });
+            root.Add(swerveDelayField);
+
             var swerveCountField = new IntegerField(m_swerveCountLabel.text)
             {
                 value = target.swerveCount,
@@ -274,19 +250,13 @@ namespace UnityEngine.InputSystem.Interactions
                 onChangedCallback?.Invoke();
             });
             root.Add(swerveCountField);
-
-            m_TapDelaySetting.OnDrawVisualElements(root, onChangedCallback);
-            m_TapTimeSetting.OnDrawVisualElements(root, onChangedCallback);
-            m_PressPointSetting.OnDrawVisualElements(root, onChangedCallback);
         }
 
 #endif
 
-        private readonly GUIContent m_swerveCountLabel = new GUIContent("Tap Count", "How many taps need to be performed in succession. Two means double-tap, three means triple-tap, and so on.");
-
-        private CustomOrDefaultSetting m_PressPointSetting;
-        private CustomOrDefaultSetting m_TapTimeSetting;
-        private CustomOrDefaultSetting m_TapDelaySetting;
+        private readonly GUIContent m_swerveTimeLabel = new GUIContent("Swerve Time", "The maximum time (in seconds) allowed to elapse between a change of direction of mouse movement for it to register as a swerve.");
+        private readonly GUIContent m_swerveDelayLabel = new GUIContent("Swerve Delay", "The maximum delay (in seconds) allowed between each swerve. If this time is exceeded, the shake is canceled.");
+        private readonly GUIContent m_swerveCountLabel = new GUIContent("Swerve Count", "How many swerves need to be performed in succession.");
     }
 #endif
 }
